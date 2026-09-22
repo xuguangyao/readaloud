@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>朗读工作台</title>
+<style>
+:root{
+  --bg:#f5f3ef; --card:#fff; --fg:#26241f; --dim:#8a847a; --line:#e5dfd5;
+  --accent:#c2410c; --accent2:#ea580c; --soft:#fff4ec; --ok:#15803d; --bad:#b91c1c;
+  --shadow:0 1px 2px rgba(40,30,20,.05),0 8px 24px rgba(40,30,20,.06);
+}
+html[data-theme="dark"]{
+  --bg:#141518; --card:#1c1f24; --fg:#dcdad5; --dim:#8b9099; --line:#2b3038;
+  --accent:#fb923c; --accent2:#f97316; --soft:#241d18; --ok:#4ade80; --bad:#f87171;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);line-height:1.6;
+  font-family:-apple-system,"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;font-size:14px}
+a{color:var(--accent)}
+header{display:flex;align-items:center;gap:12px;padding:14px 22px;background:var(--card);
+  border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+header h1{font-size:16px;margin:0;font-weight:650;letter-spacing:.3px}
+header .logo{width:26px;height:26px;border-radius:7px;background:var(--accent);color:#fff;
+  display:grid;place-items:center;font-size:14px}
+.spacer{flex:1}
+.grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(280px,.9fr);gap:16px;
+  max-width:1180px;margin:0 auto;padding:18px 22px 60px}
+@media(max-width:920px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+.card>h2{font-size:13px;margin:0;padding:12px 16px;border-bottom:1px solid var(--line);
+  color:var(--dim);font-weight:600;letter-spacing:.5px;display:flex;align-items:center;gap:8px}
+.pad{padding:14px 16px}
+/* tabs */
+.tabs{display:flex;gap:4px;padding:10px 12px 0;flex-wrap:wrap}
+.tab{padding:7px 13px;border-radius:8px 8px 0 0;cursor:pointer;color:var(--dim);
+  border:1px solid transparent;border-bottom:none;font-size:13px;user-select:none}
+.tab:hover{color:var(--fg);background:var(--soft)}
+.tab.on{color:var(--accent);background:var(--card);border-color:var(--line);
+  box-shadow:0 -2px 0 var(--accent) inset;font-weight:600}
+.pane{display:none;padding:14px 16px 16px;border-top:1px solid var(--line)}
+.pane.on{display:block}
+/* form */
+label{display:block;font-size:12px;color:var(--dim);margin:0 0 5px}
+input[type=text],input[type=number],select,textarea{width:100%;padding:8px 10px;border-radius:8px;
+  border:1px solid var(--line);background:var(--bg);color:var(--fg);font:inherit;font-size:13px}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);background:var(--card)}
+textarea{min-height:150px;resize:vertical;font-size:13px;line-height:1.7}
+.row{display:flex;gap:8px;align-items:flex-end}
+.row>*{flex:1}.row>button{flex:0 0 auto}
+button{font:inherit;font-size:13px;padding:8px 14px;border-radius:8px;cursor:pointer;
+  border:1px solid var(--line);background:var(--card);color:var(--fg);transition:.15s;white-space:nowrap}
+button:hover{border-color:var(--accent);color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+button.primary:hover{background:var(--accent2);border-color:var(--accent2);color:#fff}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.mini{padding:4px 9px;font-size:12px}
+/* file browser */
+.crumbs{display:flex;flex-wrap:wrap;gap:5px;align-items:center;font-size:12px;color:var(--dim);
+  margin-bottom:9px}
+.crumbs b{color:var(--fg);font-weight:600}
+.crumbs span{cursor:pointer;padding:1px 6px;border-radius:5px}
+.crumbs span:hover{background:var(--soft);color:var(--accent)}
+.drives{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:9px}
+.drives .chip{padding:2px 10px;font-size:12px}
+.drives .chip.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.tree{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:9px;background:var(--bg)}
+.li{display:flex;align-items:center;gap:9px;padding:7px 11px;cursor:pointer;border-bottom:1px solid var(--line);font-size:13px}
+.li:last-child{border-bottom:none}
+.li:hover{background:var(--soft)}
+.li .ic{width:16px;text-align:center;opacity:.85;flex:0 0 auto}
+.li .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.li .mt{color:var(--dim);font-size:11.5px;flex:0 0 auto;font-variant-numeric:tabular-nums}
+.li.sel{background:var(--accent);color:#fff}
+.li.sel .mt{color:rgba(255,255,255,.85)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+/* 章节面板 */
+#chaps{display:none;margin-top:8px;border:1px solid var(--line);border-radius:9px;
+  max-height:290px;overflow:auto;background:var(--bg)}
+#chaps .head{display:flex;gap:8px;align-items:center;padding:7px 10px;font-size:11.5px;
+  color:var(--dim);border-bottom:1px solid var(--line);background:var(--card);
+  position:sticky;top:0;z-index:2}
+#chaps .head b{color:var(--accent)}
+#chaps .li.sel{background:var(--accent);color:#fff}
+#chaps .li.sel .mt{color:rgba(255,255,255,.88)}
+#chaps input[type=checkbox]{width:auto;margin:0;flex:0 0 auto;accent-color:var(--accent);cursor:pointer}
+#chaps .no{padding:10px 12px;font-size:12.5px;color:var(--dim);line-height:1.7}
+.chip{padding:4px 10px;border:1px solid var(--line);border-radius:99px;font-size:12px;cursor:pointer;
+  color:var(--dim);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip:hover{border-color:var(--accent);color:var(--accent);background:var(--soft)}
+.drop{border:1.5px dashed var(--line);border-radius:11px;padding:30px 16px;text-align:center;
+  color:var(--dim);cursor:pointer;transition:.18s}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--soft);color:var(--accent)}
+.drop b{display:block;font-size:15px;color:var(--fg);margin-bottom:4px}
+.hint{font-size:12px;color:var(--dim);margin-top:8px;line-height:1.65}
+.hint code{background:var(--soft);padding:1px 5px;border-radius:4px;font-size:11.5px}
+/* progress */
+.prog{height:7px;border-radius:4px;background:var(--line);overflow:hidden;margin:10px 0 7px}
+.prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));
+  transition:width .45s ease}
+.stage{display:flex;justify-content:space-between;font-size:12.5px;align-items:center}
+.stage b{font-variant-numeric:tabular-nums}
+.tlog{margin-top:9px;font-size:11.5px;color:var(--dim);font-family:Consolas,Menlo,monospace;
+  max-height:104px;overflow:auto;background:var(--bg);border-radius:7px;padding:7px 9px;line-height:1.55}
+.tlog div{white-space:pre-wrap;word-break:break-all}
+.alert{padding:9px 11px;border-radius:8px;font-size:12.5px;margin-top:10px;line-height:1.6;word-break:break-all}
+.alert.err{background:#fef2f2;color:var(--bad);border:1px solid #fecaca}
+html[data-theme="dark"] .alert.err{background:#2a1517;border-color:#5b2026}
+.alert.ok{background:#f0fdf4;color:var(--ok);border:1px solid #bbf7d0}
+html[data-theme="dark"] .alert.ok{background:#122019;border-color:#1e402c}
+/* library */
+.lib{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:11px}
+.art{border:1px solid var(--line);border-radius:11px;padding:12px 13px;background:var(--bg);
+  display:flex;flex-direction:column;gap:7px;transition:.16s}
+.art:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--shadow)}
+.art .t{font-weight:600;font-size:13.5px;line-height:1.45;max-height:2.9em;overflow:hidden}
+.art .m{font-size:11.5px;color:var(--dim);display:flex;gap:8px;flex-wrap:wrap}
+.art .act{display:flex;gap:6px;margin-top:2px}
+.art .act button{flex:0 0 auto}
+.badge{display:inline-block;padding:1px 7px;border-radius:5px;background:var(--soft);color:var(--accent);
+  font-size:11px;font-weight:600}
+.empty{color:var(--dim);text-align:center;padding:26px 10px;font-size:13px}
+.pill{padding:3px 10px;border-radius:99px;font-size:11.5px;background:#f0fdf4;color:var(--ok);
+  border:1px solid #bbf7d0}
+html[data-theme="dark"] .pill{background:#122019;border-color:#1e402c}
+.pill.off{background:#fef2f2;color:var(--bad);border-color:#fecaca}
+html[data-theme="dark"] .pill.off{background:#2a1517;border-color:#5b2026}
+.sect{max-width:1180px;margin:0 auto;padding:0 22px}
+.sect>h2{font-size:13px;color:var(--dim);letter-spacing:.5px;margin:22px 0 10px;font-weight:600;
+  display:flex;align-items:center;gap:9px}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">🔊</div>
+  <h1>朗读工作台</h1>
+  <span class="pill" id="svc">连接中…</span>
+  <div class="spacer"></div>
+  <button class="mini" id="theme">◐ 深色</button>
+</header>
+
+<div class="grid">
+  <!-- ============ 左：内容来源 ============ -->
+  <div class="card">
+    <div class="tabs">
+      <div class="tab on" data-t="file">📁 本地文件</div>
+      <div class="tab" data-t="url">🌐 网页地址</div>
+      <div class="tab" data-t="drop">📥 拖入上传</div>
+      <div class="tab" data-t="clip">📋 剪贴板</div>
+      <div class="tab" data-t="paste">✏️ 粘贴文本</div>
+    </div>
+
+    <!-- 本地文件 -->
+    <div class="pane on" data-p="file">
+      <div class="row" style="margin-bottom:11px">
+        <div style="flex:2">
+          <label>文件路径（也可直接输入）</label>
+          <input type="text" id="fpath" placeholder="D:\docs\报告.pdf">
+        </div>
+        <button id="browse">浏览目录</button>
+      </div>
+      <div id="browser" style="display:none">
+        <div class="crumbs" id="crumbs"></div>
+        <div class="drives" id="drives"></div>
+        <div class="tree" id="tree"></div>
+        <div class="hint" id="bhint"></div>
+      </div>
+      <label style="margin-top:12px">最近的文件</label>
+      <div class="chips" id="recent"><span class="hint">加载中…</span></div>
+    </div>
+
+    <!-- 网页 -->
+    <div class="pane" data-p="url">
+      <label>网页地址</label>
+      <input type="text" id="uurl" placeholder="https://example.com/article">
+      <div class="hint">
+        静态博客、新闻站效果最好（自动去导航和广告）。<br>
+        如果是<b>需要登录的内网页面 / 钉钉文档</b>：在页面上 <code>Ctrl+A</code> 全选 →
+        <code>Ctrl+C</code> 复制，然后切到「📋 剪贴板」标签，一步就行。
+      </div>
+    </div>
+
+    <!-- 拖入 -->
+    <div class="pane" data-p="drop">
+      <div class="drop" id="drop">
+        <b>把文件拖到这里</b>
+        或点击选择文件 · 支持 PDF / txt / md / html
+      </div>
+      <input type="file" id="fin" accept=".pdf,.txt,.md,.markdown,.html,.htm" style="display:none">
+      <div class="hint" id="dropmsg">从任意位置拖进来即可（微信下载目录、桌面、U 盘都行），文件会复制到工作台的 uploads 目录再处理。</div>
+    </div>
+
+    <!-- 剪贴板 -->
+    <div class="pane" data-p="clip">
+      <button id="clipread">📋 读取当前剪贴板内容</button>
+      <div id="clipbox" style="display:none;margin-top:11px">
+        <div class="alert ok" id="clipinfo"></div>
+        <textarea id="cliptext" style="margin-top:9px" readonly></textarea>
+      </div>
+      <div class="hint">先在网页 / 文档里 <code>Ctrl+C</code>，再点上面这个按钮。适合任何复制得动、但抓不了的页面。</div>
+    </div>
+
+    <!-- 粘贴 -->
+    <div class="pane" data-p="paste">
+      <label>直接粘贴正文</label>
+      <textarea id="ptext" placeholder="把文章内容粘到这里……"></textarea>
+      <div class="hint"><span id="pcount">0</span> 字 · 约 <span id="pmins">0</span> 分钟音频</div>
+    </div>
+  </div>
+
+  <!-- ============ 右：设置与执行 ============ -->
+  <div>
+    <div class="card">
+      <h2>朗读设置</h2>
+      <div class="pad">
+        <label>音色</label>
+        <select id="voice"><option value="zh-CN-XiaoxiaoNeural">晓晓 · 女声（自然）</option></select>
+        <div style="height:11px"></div>
+        <div class="row">
+          <div>
+            <label>语速</label>
+            <select id="rate">
+              <option value="-20%">慢 -20%</option><option value="-10%">稍慢 -10%</option>
+              <option value="+0%" selected>正常</option><option value="+15%">快 +15%</option>
+              <option value="+30%">很快 +30%</option><option value="+50%">倍速 +50%</option>
+            </select>
+          </div>
+          <div>
+            <label>字数上限</label>
+            <input type="number" id="maxc" value="20000" step="1000" min="0">
+          </div>
+        </div>
+        <div id="pagesBox" style="margin-top:11px">
+          <label style="display:flex;align-items:center;gap:8px">
+            <span style="flex:1">PDF 页范围（留空=全部）</span>
+            <button class="mini" id="tocbtn" title="自动识别这本书的章节，点一下就填好页码">📑 看目录</button>
+          </label>
+          <input type="text" id="pages" placeholder="不知道填哪几页？点上面「看目录」">
+          <div id="chaps"></div>
+        </div>
+        <div class="hint" id="est" style="margin-top:11px;min-height:18px"></div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="primary" id="go" style="flex:1;padding:11px">▶ 开始朗读</button>
+          <button id="cancel" style="display:none;padding:11px 15px;border-color:var(--bad);color:var(--bad)">⏹ 取消</button>
+        </div>
+
+        <div id="runbox" style="display:none">
+          <div class="prog"><i id="pbar"></i></div>
+          <div class="stage"><span id="staget">准备中</span><b id="pct">0%</b></div>
+          <div class="tlog" id="tlog"></div>
+          <div id="result"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h2>怎么用</h2>
+      <div class="pad hint" style="margin-top:0">
+        ① 左边选内容 → ② 点「开始朗读」→ ③ 完成后点「去听」<br>
+        播放页里：<code>空格</code> 播放暂停、<code>←→</code> 跳句、<code>↑↓</code> 调语速，
+        点任意一句话从那句开始听。<br>
+        音频文件在 <code>output/&lt;文章名&gt;/article.mp3</code>，可直接拷走听。
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sect">
+  <h2>作品库 <span class="badge" id="libn">0</span></h2>
+  <div class="lib" id="lib"></div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+let mode = 'file', poll = null, pickedText = '';
+
+async function api(path, opt={}) {
+  const r = await fetch(path, Object.assign({headers:{'Content-Type':'application/json'}}, opt));
+  const j = await r.json().catch(() => ({ok:false, error:'服务返回异常'}));
+  if (!j.ok) throw new Error(j.error || '请求失败');
+  return j;
+}
+function say(kind, msg){
+  $('#result').innerHTML = `<div class="alert ${kind}">${esc(msg)}</div>`;
+}
+function esc(t){return String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function mins(chars){ const m = chars/400; return m < 1 ? '<1' : m.toFixed(0); }
+
+/* ---------- tab ---------- */
+$$('.tab').forEach(t => t.onclick = () => {
+  $$('.tab').forEach(x => x.classList.toggle('on', x===t));
+  mode = t.dataset.t;
+  $$('.pane').forEach(p => p.classList.toggle('on', p.dataset.p===mode));
+  updatePagesVis();
+  scheduleEst();
+});
+
+/* ---------- PDF 章节：点一下就填好页范围 ---------- */
+let chapData = null;
+function fmtDur(min){ return min >= 60 ? (min/60).toFixed(1)+' 小时' : min.toFixed(0)+' 分钟'; }
+/* 注意：#chaps 的初始隐藏写在 CSS 里，所以这里必须显式给 'block'；
+   写 style.display='' 会回落到 CSS 的 none，面板就永远出不来。 */
+function showChaps(html){
+  const b = $('#chaps');
+  b.innerHTML = html;
+  b.style.display = 'block';
+  b.scrollIntoView({block:'nearest', behavior:'smooth'});
+}
+async function loadChapters(){
+  const p = $('#fpath').value.trim();
+  if (!p) return showChaps('<div class="no">先在上方选一个 PDF 文件，才能看它的目录。</div>');
+  if (!/\.pdf$/i.test(p)) return showChaps('<div class="no">只有 PDF 有页码概念，txt / md / 网页不用填页范围。</div>');
+  showChaps('<div class="no">正在识别章节…（大 PDF 约需几秒）</div>');
+  try{
+    const j = await api('/api/chapters?path='+encodeURIComponent(p));
+    chapData = j;
+    if (!j.items || !j.items.length) return showChaps(`<div class="no">${esc(j.note||'没识别到章节')}</div>`);
+    const box = $('#chaps'); box.innerHTML=''; box.style.display = 'block';
+    const head = document.createElement('div'); head.className='head';
+    head.innerHTML = `<span style="flex:1">共 ${j.total_pages} 页 · 识别到 <b>${j.items.length}</b> 章`
+      + `（${esc(({bookmark:'内置书签',tocpage:'目录页',fontsize:'标题字号'})[j.method]||j.method)}）`
+      + `，勾选多章可合并</span><button class="mini" id="cclr">清除</button>`;
+    box.appendChild(head);
+    j.items.forEach((it,i)=>{
+      const el = document.createElement('div'); el.className='li';
+      el.innerHTML = `<input type="checkbox" title="勾选可多选合并">`
+        + `<span class="ic">${i+1}</span><span class="nm"></span>`
+        + `<span class="mt">${it.from}${it.to>it.from?'-'+it.to:''}页 · ${it.chars.toLocaleString()}字 · ${fmtDur(it.audio_min)}</span>`;
+      el.querySelector('.nm').textContent = it.title;
+      el.onclick = e => {
+        if (e.target.tagName === 'INPUT') return;      // 点框交给 onchange
+        // 单选：清掉其它所有勾选与高亮，只选这一章（高亮与勾选状态保持一致）
+        $$('#chaps .li').forEach(x => {
+          x.classList.remove('sel');
+          const c = x.querySelector('input'); if (c) c.checked = false;
+        });
+        el.classList.add('sel');
+        el.querySelector('input').checked = true;
+        fillPages([it]);
+      };
+      el.querySelector('input').onchange = () => {
+        // 多选：勾了的都合并填进去；一个没勾就清空
+        el.classList.toggle('sel', el.querySelector('input').checked);
+        const on = [...box.querySelectorAll('.li')].map((row, i) =>
+          row.querySelector('input')?.checked ? j.items[i] : null).filter(Boolean);
+        if (on.length) fillPages(on);
+        else { $('#pages').value = ''; scheduleEst(); }
+      };
+      box.appendChild(el);
+    });
+    $('#cclr').onclick = () => {
+      $$('#chaps input[type=checkbox]').forEach(c=>{c.checked=false;});
+      $$('#chaps .li.sel').forEach(x=>x.classList.remove('sel'));
+      $('#pages').value=''; scheduleEst();
+    };
+  }catch(e){ showChaps(`<div class="no" style="color:var(--bad)">${esc(e.message.replace(/\n/g,' '))}</div>`); }
+}
+function fillPages(items){
+  const sorted = [...items].sort((a,b)=>a.from-b.from);
+  $('#pages').value = sorted.map(it => it.from===it.to ? String(it.from) : `${it.from}-${it.to}`).join(',');
+  scheduleEst();
+}
+$('#tocbtn').onclick = loadChapters;
+
+/* ---------- 目录浏览 ---------- */
+async function browse(path){
+  try{
+    const j = await api('/api/browse'+(path?('?path='+encodeURIComponent(path)):''));
+    $('#fpath').value = '';
+    renderCrumbs(j.path);
+    const tree = $('#tree'); tree.innerHTML = '';
+    if (j.parent){
+      const up = document.createElement('div');
+      up.className='li'; up.innerHTML = '<span class="ic">↩</span><span class="nm">.. 上一级</span>';
+      up.onclick = () => browse(j.parent);
+      tree.appendChild(up);
+    }
+    j.dirs.forEach(d=>{
+      const el=document.createElement('div');
+      el.innerHTML='<span class="ic">📁</span><span class="nm"></span>';
+      el.querySelector('.nm').textContent=d;
+      el.onclick=()=>browse(j.path.replace(/[\\/]$/,'')+'\\'+d);
+      tree.appendChild(el);
+    });
+    j.files.forEach(f=>{
+      const el=document.createElement('div'); el.className='li';
+      el.innerHTML=`<span class="ic">${icon(f.name)}</span><span class="nm"></span>`
+        +`<span class="mt">${f.size} · ${f.mtime}</span>`;
+      el.querySelector('.nm').textContent=f.name;
+      el.onclick=()=>{
+        $$('.li.sel').forEach(x=>x.classList.remove('sel'));
+        el.classList.add('sel');
+        $('#fpath').value = j.path.replace(/[\\/]$/,'')+'\\'+f.name;
+        $('#pages').value='';
+        scheduleEst();
+      };
+      tree.appendChild(el);
+    });
+    if (!j.dirs.length && !j.files.length)
+      tree.innerHTML='<div class="li"><span class="nm" style="color:var(--dim)">（空目录）</span></div>';
+    renderDrives(j.path);
+    $('#bhint').textContent = `${j.path} — ${j.dirs.length} 个子目录 / ${j.files.length} 个可朗读文件。`;
+  }catch(e){ showBrowseErr(e.message, path); }
+}
+function renderDrives(cur){
+  const box=$('#drives'); if(!box || !DRIVES.length) return;
+  box.innerHTML='';
+  DRIVES.forEach(d=>{
+    const c=document.createElement('span'); c.className='chip';
+    if((cur||'').slice(0,2).toUpperCase()===d.slice(0,2).toUpperCase()) c.classList.add('on');
+    c.textContent='💽 '+d.replace(/\\$/,'');
+    c.onclick=()=>browse(d);
+    box.appendChild(c);
+  });
+}
+function showBrowseErr(msg, path){
+  $('#crumbs').innerHTML='';
+  $('#tree').innerHTML = `<div class="li"><span class="nm" style="color:var(--bad)">${esc(msg)}</span></div>`;
+  $('#bhint').innerHTML = '可以在上方输入框直接填写完整路径，或点下面的快捷目录：'
+    + (roots||[]).map(r=>`<span class="chip" onclick="browse('${r.replace(/\\/g,'\\\\')}')">${esc(r)}</span>`).join(' ');
+}
+function icon(n){
+  const e=n.slice(n.lastIndexOf('.')).toLowerCase();
+  return {'.pdf':'📕','.txt':'📄','.md':'📝','.html':'🌐','.htm':'🌐'}[e]||'📄';
+}
+function renderCrumbs(p){
+  const box=$('#crumbs'); box.innerHTML='';
+  const parts=p.replace(/[\\/]$/,'').split(/[\\/]/);
+  let acc='';
+  parts.forEach((seg,i)=>{
+    acc = i===0 ? seg+'\\' : acc+seg+(i<parts.length-1?'\\':'');
+    const s=document.createElement('span');
+    s.textContent = (i===0 && seg.length===2) ? seg+'盘' : seg;
+    if (i===parts.length-1){ const b=document.createElement('b'); b.textContent=s.textContent; box.appendChild(b); }
+    else { const full=acc; s.onclick=()=>browse(full); box.appendChild(s); box.appendChild(document.createTextNode('/')); }
+  });
+}
+$('#browse').onclick = () => {
+  const b=$('#browser'); b.style.display = b.style.display==='none'?'':'none';
+  if (b.style.display!=='none' && !$('#tree').children.length) browse($('#fpath').value.trim()||'');
+};
+
+/* ---------- 最近文件 / 快捷目录 ---------- */
+async function loadRecent(){
+  try{
+    const j = await api('/api/recent');
+    const box=$('#recent'); box.innerHTML='';
+    if(!j.files.length){ box.innerHTML='<span class="hint">没找到文件，用「浏览目录」挑一个</span>'; return; }
+    j.files.forEach(f=>{
+      const c=document.createElement('span'); c.className='chip';
+      c.textContent=f.name; c.title=f.path+'  ('+f.when+')';
+      c.onclick=()=>{ $('#fpath').value=f.path; $$('.tab')[0].click(); scheduleEst();
+        $('#fpath').scrollIntoView({block:'center',behavior:'smooth'}); };
+      box.appendChild(c);
+    });
+  }catch(e){ $('#recent').innerHTML='<span class="hint">加载失败</span>'; }
+}
+let roots=[]; let DRIVES=[];
+async function loadRoots(){
+  try{ const j=await api('/api/roots'); roots=j.roots; DRIVES=j.drives||[];
+    const box=$('#recent');
+    j.roots.slice(0,6).forEach(r=>{
+      const c=document.createElement('span'); c.className='chip'; c.style.borderColor='var(--accent)';
+      c.textContent='📂 '+r.replace(/^.*[\\/]/,'')+'…'; c.title=r;
+      c.onclick=()=>{ $('#browser').style.display=''; browse(r); };
+      box.appendChild(c);
+    });
+    (j.drives||[]).forEach(d=>{
+      const c=document.createElement('span'); c.className='chip';
+      c.textContent='💽 '+d.replace(/\\$/,''); c.title=d;
+      c.onclick=()=>{ $('#browser').style.display=''; browse(d); };
+      box.appendChild(c);
+    });
+  }catch(e){}
+}
+
+/* ---------- 拖入上传 ---------- */
+const drop=$('#drop');
+drop.onclick=()=>$('#fin').click();
+$('#fin').onchange=e=>e.target.files[0]&&upload(e.target.files[0]);
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over')}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over')}));
+drop.addEventListener('drop',e=>e.dataTransfer.files[0]&&upload(e.dataTransfer.files[0]));
+async function upload(f){
+  if (f.size > 200*1048576) return $('#dropmsg').innerHTML='<span style="color:var(--bad)">文件超过 200MB</span>';
+  $('#dropmsg').innerHTML=`正在上传 <b>${esc(f.name)}</b>（${(f.size/1048576).toFixed(1)} MB）…`;
+  try{
+    const buf=await f.arrayBuffer();
+    const r=await fetch('/api/upload?name='+encodeURIComponent(f.name),{method:'POST',body:buf});
+    const j=await r.json();
+    if(!j.ok) throw new Error(j.error);
+    $('#dropmsg').innerHTML=`<span style="color:var(--ok)">✓ 已接收 ${esc(j.name)}（${j.size}），路径已填好，直接点「开始朗读」</span>`;
+    $$('.tab')[0].click(); $('#fpath').value=j.path; scheduleEst();
+  }catch(e){ $('#dropmsg').innerHTML='<span style="color:var(--bad)">上传失败：'+esc(e.message)+'</span>'; }
+}
+
+/* ---------- 剪贴板 / 粘贴 ---------- */
+$('#clipread').onclick=async()=>{
+  const box=$('#clipbox');
+  $('#clipread').disabled=true;
+  try{
+    const j=await api('/api/clipboard');
+    box.style.display='';
+    if(!j.chars){ pickedText=''; $('#clipinfo').className='alert err';
+      $('#clipinfo').innerHTML='剪贴板是空的。先去网页里 <code>Ctrl+A</code> 全选 → <code>Ctrl+C</code> 复制，再点一次。';
+      $('#cliptext').value=''; return; }
+    pickedText=j.text;
+    $('#clipinfo').className='alert ok';
+    $('#clipinfo').innerHTML=`读到 <b>${j.chars}</b> 字 · 约 <b>${mins(j.chars)}</b> 分钟音频
+      （下面只显示前 4000 字）· 现在点右侧「▶ 开始朗读」即可`;
+    $('#cliptext').value=j.text.slice(0,4000);
+    scheduleEst();
+  }catch(e){ box.style.display=''; $('#clipinfo').className='alert err'; $('#clipinfo').textContent=e.message; }
+  finally{ $('#clipread').disabled=false; }
+};
+$('#ptext').oninput=e=>{
+  const n=e.target.value.trim().length;
+  $('#pcount').textContent=n; $('#pmins').textContent=mins(n);
+};
+
+/* ---------- 参数收集 / 校验 ---------- */
+function isPdf(){ return /\.pdf$/i.test($('#fpath').value.trim()); }
+function updatePagesVis(){
+  const show = (mode==='file' || mode==='drop') && isPdf();
+  $('#pagesBox').style.display = show ? '' : 'none';
+  if (!show){ $('#chaps').style.display = 'none'; }
+}
+function collectOpt(){
+  const pdf = (mode==='file' || mode==='drop') && isPdf();
+  const o = {voice:$('#voice').value, rate:$('#rate').value,
+             pages: pdf ? $('#pages').value.trim() : ''};
+  const mc = parseInt($('#maxc').value);
+  o.max_chars = isNaN(mc) ? -1 : mc;
+  if (mode==='file' || mode==='drop') o.target = $('#fpath').value.trim();
+  else if (mode==='url')  o.target = $('#uurl').value.trim();
+  else if (mode==='clip') o.target = 'clipboard';
+  else o.text = $('#ptext').value.trim();
+  return o;
+}
+function validate(o){
+  if (o.text !== undefined) return o.text ? null : '先粘贴一些文字';
+  if (mode==='url' && !/^https?:\/\//i.test(o.target||'')) return '填以 http 开头的完整网址';
+  if (mode==='clip' && !pickedText.trim()) return '先点「读取当前剪贴板内容」';
+  if (!o.target) return mode==='file' ? '先选一个文件（浏览目录或点最近的）' : '先把文件拖进左边的框';
+  return null;
+}
+
+/* ---------- 开始 / 取消 ---------- */
+let curTask = null;
+function setBusy(on){
+  $('#go').style.display = on ? 'none' : '';
+  $('#cancel').style.display = on ? '' : 'none';
+  if (!on){ $('#cancel').disabled = false; $('#cancel').textContent = '⏹ 取消'; }
+}
+$('#go').onclick = async () => {
+  const opt = collectOpt();
+  const bad = validate(opt);
+  if (bad) { $('#runbox').style.display=''; return say('err', bad); }
+  curTask = null;
+  $('#runbox').style.display=''; $('#result').innerHTML=''; $('#tlog').innerHTML='';
+  $('#pbar').style.width='2%'; $('#pct').textContent='0%'; $('#staget').textContent='排队中';
+  setBusy(true);
+  try{
+    const j = await api('/api/make',{method:'POST',body:JSON.stringify(opt)});
+    curTask = j.id; startPoll(j.id);
+  }catch(e){ finish(e.message); }
+};
+$('#cancel').onclick = async () => {
+  if (!curTask) return;
+  $('#cancel').disabled = true; $('#cancel').textContent = '取消中…';
+  try { await api('/api/cancel',{method:'POST',body:JSON.stringify({id:curTask})}); }
+  catch(e){ $('#cancel').disabled=false; $('#cancel').textContent='⏹ 取消'; }
+};
+function flash(msg){ $('#runbox').style.display=''; say('err', msg); }
+function finish(msg){ stopPoll(); setBusy(false); if(msg) say('err',msg); }
+function stopPoll(){ if(poll){ poll.stop(); poll=null; } }
+
+/* ---------- 字数预估（点之前就知道会读多少） ---------- */
+let estTimer = null;
+function scheduleEst(){ updatePagesVis(); clearTimeout(estTimer); estTimer = setTimeout(runEst, 800); }
+async function runEst(){
+  const o = collectOpt(); const box = $('#est');
+  if (!o.target && !o.text){ box.innerHTML=''; return; }
+  if (validate(o)){ box.innerHTML=''; return; }
+  box.innerHTML = '<span style="opacity:.6">正在统计字数…（大 PDF 约需几秒）</span>';
+  try{
+    const j = await api('/api/preview?opt='+encodeURIComponent(JSON.stringify(o)));
+    box.innerHTML = estHtml(j);
+  }catch(e){
+    box.innerHTML = `<span style="color:var(--bad)">${esc(e.message.replace(/\n/g,' ')).slice(0,150)}</span>`;
+  }
+}
+function estHtml(j){
+  const dur = j.audio_min >= 60 ? (j.audio_min/60).toFixed(1)+' 小时' : j.audio_min.toFixed(0)+' 分钟';
+  const syn = j.synth_sec >= 60 ? (j.synth_sec/60).toFixed(1)+' 分钟' : j.synth_sec.toFixed(0)+' 秒';
+  let h = `将读 <b>${j.used_chars.toLocaleString()}</b> 字 · ${j.paras} 段 → 音频约 <b>${dur}</b>`
+        + `，合成约 <b>${syn}</b>，mp3 约 ${j.mp3_mb} MB`;
+  if (j.truncated) h += `<br><span style="color:var(--bad)">⚠ 实际有 ${j.full_chars.toLocaleString()} 字，`
+        + `被「字数上限」截到 ${(j.used_chars/j.full_chars*100).toFixed(0)}%。`
+        + `想读更多就把上限改大或填 <code>0</code>。</span>`;
+  if (j.where) h += `<br><span style="opacity:.6">${esc(j.where)}</span>`;
+  return h;
+}
+['pages','maxc','fpath','uurl','ptext'].forEach(id=>{
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', scheduleEst);
+});
+$('#voice').onchange = scheduleEst;
+$('#rate').onchange = scheduleEst;
+
+function startPoll(id){
+  let alive = true;
+  poll = { stop(){ alive = false; } };
+  const step = async () => {
+    if (!alive) return;
+    let j;
+    try { j = await api('/api/progress?id='+id); }
+    catch(e){ if(alive) finish(e.message); return; }
+    if (!alive) return;
+    $('#staget').textContent = j.name + ' — ' + j.stage;
+    $('#pct').textContent = j.percent.toFixed(0) + '%';
+    $('#pbar').style.width = Math.max(2, j.percent) + '%';
+    $('#tlog').innerHTML = j.log.map(s=>`<div>${esc(s)}</div>`).join('');
+    $('#tlog').scrollTop = 1e9;
+    if (j.state === 'done'){
+      alive = false; poll = null; setBusy(false);
+      const r = j.result;
+      $('#result').innerHTML=`<div class="alert ok">✓ 完成：${r.words} 字 / 约 ${(r.duration/60).toFixed(0)} 分钟音频</div>
+        <a href="${r.url}" target="_blank" rel="noopener"
+           style="display:block;margin-top:9px;padding:11px;text-align:center;border-radius:9px;
+                  background:var(--accent);color:#fff;font-weight:600;text-decoration:none">
+           ▶ 去听《${esc(r.title)}》</a>`;
+      loadLib();
+    } else if (j.state === 'cancelled'){
+      alive = false; poll = null; setBusy(false);
+      $('#pbar').style.width = '0%'; $('#pct').textContent = '已取消';
+      $('#staget').textContent = j.name + ' — 已取消';
+      $('#result').innerHTML = '<div class="alert">已取消，没有生成音频（原有版本未受影响）。'
+                             + '改好设置再点「▶ 开始朗读」即可。</div>';
+    } else if (j.state === 'error'){
+      finish(j.error);
+    } else {
+      if (j.cancel) { $('#staget').textContent = j.name + ' — 正在取消…'; }
+      setTimeout(step, 900);            // 上一次回来才排下一次，避免请求堆积
+    }
+  };
+  step();
+}
+
+/* ---------- 作品库 ---------- */
+async function loadLib(){
+  try{
+    const j=await api('/api/library');
+    $('#libn').textContent=j.items.length;
+    const box=$('#lib'); box.innerHTML='';
+    if(!j.items.length){ box.innerHTML='<div class="empty">还没有作品。转换完成后会出现在这里。</div>'; return; }
+    j.items.forEach(a=>{
+      const el=document.createElement('div'); el.className='art';
+      el.innerHTML=`<div class="t">${esc(a.title)}</div>
+        <div class="m"><span class="badge">${esc(a.type||'')}</span><span>${a.words} 字</span>
+        <span>${(a.duration/60).toFixed(0)} 分钟</span><span>${esc(a.created)}</span></div>
+        <div class="m" style="opacity:.7">${esc(a.src.slice(-46))}</div>
+        <div class="act">
+          <button class="primary mini" style="flex:1">▶ 听</button>
+          <button class="mini" data-a="f" title="打开所在文件夹">📂</button>
+          <button class="mini" data-a="d" title="删除">🗑</button>
+        </div>`;
+      el.querySelector('.primary').onclick=()=>window.open(a.url,'_blank');
+      el.querySelector('[data-a=f]').onclick=()=>api('/api/reveal',{method:'POST',body:JSON.stringify({slug:a.slug})}).catch(e=>alert(e.message));
+      el.querySelector('[data-a=d]').onclick=async()=>{
+        if(!confirm(`删除《${a.title}》？音频和页面都会删掉。`)) return;
+        await api('/api/delete',{method:'POST',body:JSON.stringify({slug:a.slug})}).catch(e=>alert(e.message));
+        loadLib();
+      };
+      box.appendChild(el);
+    });
+  }catch(e){ $('#lib').innerHTML='<div class="empty">作品库加载失败</div>'; }
+}
+
+/* ---------- 音色 ---------- */
+async function loadVoices(){
+  try{
+    const j=await api('/api/voices');
+    const sel=$('#voice'); sel.innerHTML='';
+    const nice={'Xiaoxiao':'晓晓 女·自然','Xiaoyi':'晓伊 女·年轻','Yunxi':'云希 男·清亮',
+      'Yunyang':'云扬 男·播报','Yunjian':'云健 男·浑厚','Yunxia':'云夏 男·少年',
+      'Xiaobei':'晓贝 东北话','Xiaoni':'晓妮 陕西话','HiuGaai':'晓臻 粤语','Xiaomo':'晓墨 女'};
+    j.voices.forEach(v=>{
+      const key=Object.keys(nice).find(k=>v.short.includes(k));
+      const o=document.createElement('option'); o.value=v.short;
+      o.textContent=(key?nice[key]:v.short)+'  ['+v.locale+']';
+      if(v.short==='zh-CN-XiaoxiaoNeural') o.selected=true;
+      sel.appendChild(o);
+    });
+  }catch(e){}
+}
+
+/* ---------- 杂项 ---------- */
+$('#theme').onclick=()=>{
+  const h=document.documentElement;
+  h.dataset.theme=h.dataset.theme==='dark'?'light':'dark';
+  $('#theme').textContent=h.dataset.theme==='dark'?'◐ 浅色':'◐ 深色';
+  localStorage.setItem('ra_theme',h.dataset.theme);
+};
+if(localStorage.getItem('ra_theme')){
+  document.documentElement.dataset.theme=localStorage.getItem('ra_theme');
+  $('#theme').textContent=document.documentElement.dataset.theme==='dark'?'◐ 浅色':'◐ 深色';
+}
+(async()=>{
+  try{ await fetch('/api/roots'); $('#svc').textContent='服务正常'; }
+  catch(e){ $('#svc').textContent='服务未连接'; $('#svc').className='pill off'; }
+  loadRoots(); loadRecent(); loadVoices(); loadLib();
+})();
+</script>
+</body>
+</html>
