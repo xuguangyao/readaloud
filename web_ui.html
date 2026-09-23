@@ -109,9 +109,17 @@ button.mini{padding:4px 9px;font-size:12px}
 html[data-theme="dark"] .alert.err{background:#2a1517;border-color:#5b2026}
 .alert.ok{background:#f0fdf4;color:var(--ok);border:1px solid #bbf7d0}
 html[data-theme="dark"] .alert.ok{background:#122019;border-color:#1e402c}
-/* library */
-.lib{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:11px}
-.art{border:1px solid var(--line);border-radius:11px;padding:12px 13px;background:var(--bg);
+/* library（横向滑动 + 分批渲染） */
+.lib{display:flex;gap:11px;overflow-x:auto;padding:4px 2px 12px;scrollbar-width:thin}
+.lib::-webkit-scrollbar{height:8px}
+.lib::-webkit-scrollbar-thumb{background:var(--line);border-radius:99px}
+.lib::-webkit-scrollbar-thumb:hover{background:var(--accent)}
+.lib::-webkit-scrollbar-track{background:transparent}
+.lib .empty{flex:1 1 auto}
+.libnav{margin-left:auto;display:inline-flex;gap:5px}
+.libnav button{padding:2px 11px}
+.lib .allin{flex:0 0 auto;align-self:center;color:var(--dim);font-size:12px;padding:0 14px;white-space:nowrap}
+.art{flex:0 0 248px;border:1px solid var(--line);border-radius:11px;padding:12px 13px;background:var(--bg);
   display:flex;flex-direction:column;gap:7px;transition:.16s}
 .art:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--shadow)}
 .art .t{font-weight:600;font-size:13.5px;line-height:1.45;max-height:2.9em;overflow:hidden}
@@ -267,7 +275,12 @@ html[data-theme="dark"] .pill.off{background:#2a1517;border-color:#5b2026}
 </div>
 
 <div class="sect">
-  <h2>作品库 <span class="badge" id="libn">0</span></h2>
+  <h2 style="display:flex;align-items:center;gap:9px">作品库 <span class="badge" id="libn">0</span>
+    <span class="libnav">
+      <button class="mini" id="libL" title="往左翻一屏">◀</button>
+      <button class="mini" id="libR" title="往右翻一屏">▶</button>
+    </span>
+  </h2>
   <div class="lib" id="lib"></div>
 </div>
 
@@ -649,35 +662,66 @@ function startPoll(id){
   step();
 }
 
-/* ---------- 作品库 ---------- */
+/* ---------- 作品库（横向滑动 + 分批渲染） ---------- */
+const LIB_BATCH = 10;                 // 每批渲染的卡片数；滚到头自动加载下一批
+let libItems = [], libShown = 0, libObs = null;
+function makeArtCard(a){
+  const el=document.createElement('div'); el.className='art';
+  el.innerHTML=`<div class="t">${esc(a.title)}</div>
+    <div class="m"><span class="badge">${esc(a.type||'')}</span><span>${a.words} 字</span>
+    <span>${(a.duration/60).toFixed(0)} 分钟</span><span>${esc(a.created)}</span></div>
+    <div class="m" style="opacity:.7">${esc(a.src.slice(-46))}</div>
+    <div class="act">
+      <button class="primary mini" style="flex:1">▶ 听</button>
+      <button class="mini" data-a="f" title="打开所在文件夹">📂</button>
+      <button class="mini" data-a="d" title="删除">🗑</button>
+    </div>`;
+  el.querySelector('.primary').onclick=()=>window.open(a.url,'_blank');
+  el.querySelector('[data-a=f]').onclick=()=>api('/api/reveal',{method:'POST',body:JSON.stringify({slug:a.slug})}).catch(e=>alert(e.message));
+  el.querySelector('[data-a=d]').onclick=async()=>{
+    if(!confirm(`删除《${a.title}》？音频和页面都会删掉。`)) return;
+    await api('/api/delete',{method:'POST',body:JSON.stringify({slug:a.slug})}).catch(e=>alert(e.message));
+    loadLib();
+  };
+  return el;
+}
+function renderLibBatch(){
+  const box=$('#lib');
+  box.querySelectorAll('.sentinel,.allin').forEach(x=>x.remove());
+  const frag=document.createDocumentFragment();
+  const end=Math.min(libShown+LIB_BATCH, libItems.length);
+  for(let i=libShown;i<end;i++) frag.appendChild(makeArtCard(libItems[i]));
+  libShown=end;
+  box.appendChild(frag);
+  if(libShown < libItems.length){          // 还有没渲染的：末尾放哨兵，滚到头自动补下一批
+    const s=document.createElement('div'); s.className='sentinel'; s.style.flex='0 0 2px';
+    box.appendChild(s);
+    if(!libObs) libObs=new IntersectionObserver(es=>{
+      if(es.some(e=>e.isIntersecting)) renderLibBatch();
+    },{root:box,rootMargin:'0px 160px 0px 0px'});
+    libObs.observe(s);
+  } else if(libItems.length > LIB_BATCH){
+    const t=document.createElement('div'); t.className='allin';
+    t.textContent=`— 共 ${libItems.length} 个，已全部加载 —`;
+    box.appendChild(t);
+  }
+}
 async function loadLib(){
   try{
     const j=await api('/api/library');
     $('#libn').textContent=j.items.length;
-    const box=$('#lib'); box.innerHTML='';
+    libItems=j.items; libShown=0;
+    if(libObs){ libObs.disconnect(); }
+    const box=$('#lib'); box.innerHTML=''; box.scrollLeft=0;
     if(!j.items.length){ box.innerHTML='<div class="empty">还没有作品。转换完成后会出现在这里。</div>'; return; }
-    j.items.forEach(a=>{
-      const el=document.createElement('div'); el.className='art';
-      el.innerHTML=`<div class="t">${esc(a.title)}</div>
-        <div class="m"><span class="badge">${esc(a.type||'')}</span><span>${a.words} 字</span>
-        <span>${(a.duration/60).toFixed(0)} 分钟</span><span>${esc(a.created)}</span></div>
-        <div class="m" style="opacity:.7">${esc(a.src.slice(-46))}</div>
-        <div class="act">
-          <button class="primary mini" style="flex:1">▶ 听</button>
-          <button class="mini" data-a="f" title="打开所在文件夹">📂</button>
-          <button class="mini" data-a="d" title="删除">🗑</button>
-        </div>`;
-      el.querySelector('.primary').onclick=()=>window.open(a.url,'_blank');
-      el.querySelector('[data-a=f]').onclick=()=>api('/api/reveal',{method:'POST',body:JSON.stringify({slug:a.slug})}).catch(e=>alert(e.message));
-      el.querySelector('[data-a=d]').onclick=async()=>{
-        if(!confirm(`删除《${a.title}》？音频和页面都会删掉。`)) return;
-        await api('/api/delete',{method:'POST',body:JSON.stringify({slug:a.slug})}).catch(e=>alert(e.message));
-        loadLib();
-      };
-      box.appendChild(el);
-    });
+    renderLibBatch();
   }catch(e){ $('#lib').innerHTML='<div class="empty">作品库加载失败</div>'; }
 }
+$('#libL').onclick=()=>$('#lib').scrollBy({left:-$('#lib').clientWidth*0.85,behavior:'smooth'});
+$('#libR').onclick=()=>$('#lib').scrollBy({left: $('#lib').clientWidth*0.85,behavior:'smooth'});
+$('#lib').addEventListener('wheel',e=>{     // 鼠标滚轮上下滚 = 卡片左右翻
+  if(Math.abs(e.deltaY)>Math.abs(e.deltaX)){ e.preventDefault(); $('#lib').scrollLeft+=e.deltaY; }
+},{passive:false});
 
 /* ---------- 音色 ---------- */
 async function loadVoices(){
